@@ -29,7 +29,7 @@ xyMin=[-10 -10]; xyMax=[10 10];
 startXY=[-8,-8]; goalXY=[10,4];
 
 % Tall vertical wall (blue) and a building (gray)
-wall=[0.5 -7.5;0.7 -7.5;0.7 4.5;0.5 4.5];
+wall=[0.5 -8;0.7 -8;0.7 5;0.5 5];
 bldg=[4 4;7 4;7 7;4 7];
 
 inflate=@(poly,r)[min(poly(:,1))-r,min(poly(:,2))-r;
