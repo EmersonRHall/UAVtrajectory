@@ -1,0 +1,3 @@
+This is week 1 of the research.  
+This week established the project scope, objectives, and success metrics for UAV trajectory optimization. The focus was on comparing traditional algorithms such as A* and RRT with machine learning methods, especially reinforcement learning and imitation learning. Key performance goals were defined around efficiency, safety, computation speed, and adaptability.
+A literature review surveyed recent research on UAV path planning and control, highlighting reinforcement learning approaches such as DQN, PPO, SAC, and hybrid methods. These studies demonstrated how machine learning can enhance UAV adaptability in dynamic environments, improve secure communication, support multi-UAV coordination, and enable real-time path planning.
