@@ -1,0 +1,4 @@
+This is week 3 of the research.
+This code sets up a simulation environment for unmanned aerial vehicle trajectory testing using MATLAB’s UAV Toolbox. The environment includes a ground plane, a thin wall, and a square block as obstacles, with a quadrotor platform executing a waypoint-based mission. The UAV ascends, navigates along the wall, passes through a gap, flies around the block, and descends to its final position.
+The simulation runs with a kinematic waypoint tracker that limits the UAV’s velocity to 1.2 m/s and checks a tolerance for waypoint completion. Visualization is provided through 3D rendering, showing the UAV’s movement and leaving a trajectory trail. At the end of the mission, the simulation confirms successful navigation with the “Mission Complete” message.
+This environment forms the foundation for testing more advanced trajectory planning and optimization approaches in later project phases.
