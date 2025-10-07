@@ -1,4 +1,4 @@
-This is week 4 of the research. 
+This is week 4 of the research.   
 This code implements a baseline trajectory planner for an unmanned aerial vehicle using the A* algorithm in MATLAB. 
 The environment is modeled as a bounded area with static obstacles, which are inflated by a safety margin to ensure clearance.
 An occupancy grid with 0.2 meter resolution is used to represent free and occupied space.
