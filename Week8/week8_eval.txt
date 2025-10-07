@@ -1,0 +1,8 @@
+Week 8 — Evaluation & Hyperparameter Tuning
+Splits: Ntr=68, Nva=15, Nte=14, D=16 (kept=12, dropped=4 -> [3 6 7 8])
+
+Best ridge lambda: 0.0001
+
+Train:  RMSE=0.00000043  MAE=0.00000011  Cos=1.000000  Success=97.1% (eps=1e-06)
+Val:    RMSE=0.00000157  MAE=0.00000030  Cos=1.000000  Success=80.0% (eps=1e-06)
+Test:   RMSE=0.00000100  MAE=0.00000026  Cos=1.000000  Success=85.7% (eps=1e-06)
