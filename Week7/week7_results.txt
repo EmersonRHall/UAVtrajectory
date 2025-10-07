@@ -1,0 +1,12 @@
+Week 7 — Initial Model Training (MATLAB, behavior cloning)
+Data: Ntr=68, Nva=15, Nte=14, D=16
+
+== Ordinary Least Squares ==
+Train: MSE=NaN, MAE=NaN, Cos=NaN
+Val  : MSE=NaN, MAE=NaN, Cos=NaN
+Test : MSE=NaN, MAE=NaN, Cos=NaN
+
+== Ridge Regression (best lambda=0.0001) ==
+Train: MSE=0.000000, MAE=0.000000, Cos=1.000000
+Val  : MSE=0.000000, MAE=0.000000, Cos=1.000000
+Test : MSE=0.000000, MAE=0.000000, Cos=1.000000
