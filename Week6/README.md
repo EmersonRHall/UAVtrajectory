@@ -1,4 +1,4 @@
-This is week 6 of the research.
+This is week 6 of the research.  
 This code transforms raw UAV trajectory data from the baseline A* planner into a dataset suitable for machine learning. Each point along the path is logged with position, velocity, wind conditions, goal information, and radial distances to nearby obstacles in eight compass directions. These values are assembled into feature vectors, while the UAV’s velocity actions serve as labels.
 The dataset is standardized using z-score normalization so that all features share a common scale. The processed data is then split into training, validation, and test sets, ensuring balanced distributions and preventing overfitting. Final outputs are saved as both MATLAB .mat structures and CSV files for inspection.
 This dataset forms the foundation for training and evaluating reinforcement learning models, providing the necessary global, local, and environmental information to support UAV trajectory optimization.
