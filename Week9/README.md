@@ -1,2 +1,2 @@
 This is week 9 of the research.  
-It is still in the process. Currently working on bettering the randomization of the obstacles and the UAV's ability to avoid them.
+Week 9 goes through the process of the UAV becoming better with navigating through different obstacles. First, I began with getting the UAV through the same, stationary obstacles. Once the UAV became consistent, I moved on to getting the UAV to be able to navigate through the still and moving objects. The UAV consistantly avoided the objects so I create a random layout of the still objects and one moving object. The UAV for the most part can navigate through these objects. There are still some hiccups.
