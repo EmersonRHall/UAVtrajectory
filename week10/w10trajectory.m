@@ -110,7 +110,7 @@ traj=nan(Nsteps,2,NU); speed_hist=nan(Nsteps,NU);
 bestGoalDist = vecnorm((goals - pos).').'; stallClock=zeros(NU,1); reached=false(NU,1);
 
 fig=figure('Color','w'); try,set(fig,'Position',[90 60 980 980]); end
-vOut=VideoWriter('week10_multi_like_week9.mp4','MPEG-4'); vOut.FrameRate=round(1/dt); open(vOut);
+vOut=VideoWriter('week10_multi.mp4','MPEG-4'); vOut.FrameRate=round(1/dt); open(vOut);
 colors=lines(max(NU,4));
 
 %% Occupancy helpers
