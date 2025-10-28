@@ -21,7 +21,7 @@ rc_from_xy = @(xy) [ clamp(floor((xy(2)-xyMin(2))/gridRes)+1,1,mapRows), ...
 r_pix = max(1, ceil(safetyMargin / gridRes)); se_static = strel('disk', r_pix, 0);
 maxTries = 60; SG_MIN_CLR = safetyMargin + 0.45;
 
-NU = 2; minSGsep = 4.0;
+NU = 3; minSGsep = 4.0;
 
 for attempt=1:maxTries
     wall_thickness = 0.35 + 0.45*rand;
