@@ -1,10 +1,4 @@
 %% Week 11 — Validation (deterministic scenarios across weather/mode)
-% - Same terrain + starts/goals for all weathers and both modes (fair A/B)
-% - 720×720 stable video capture
-% - All collision checks use THICK occupancy
-% - Robust SG placement with BFS connectivity on inflated grid
-% - Natural terrain fix: no features in pond; no overlapping "buildings" (rocks/logs)
-% - Unique-path planning: reserve/dilate other UAVs' corridors to force distinct routes
 
 clc; close all;
 
@@ -113,22 +107,45 @@ for p=1:numel(staticPolys)
 end
 occ_static = imdilate(occ_raw,se_static);
 
-% Place SG deterministically (adaptive ladder + BFS on inflated grid)
 NU = opts.NU;
+
+% --- Terrain-specific SG spacing + clearance ---
 if strcmpi(terrainName,'natural')
-    minSGsep_base = 7.0;  % wider spacing to avoid overlap
+    % Natural: big open areas but we want them well separated
+    minSGsep_base  = 7.0;
+    SG_MIN_CLR_base = safetyMargin + 0.50;
+
+elseif strcmpi(terrainName,'man_made')
+    minSGsep_base   = 3.5;                 % allow starts/goals closer to each other
+    SG_MIN_CLR_base = safetyMargin + 0.20; % allow closer to inflated obstacles
+
 else
-    minSGsep_base = 4.5;
+    % Urban default
+    minSGsep_base   = 4.5;
+    SG_MIN_CLR_base = safetyMargin + 0.50;
 end
-SG_MIN_CLR_base = safetyMargin + 0.50;
+
 
 relax_SG_CLR = [1.00 0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50];
 relax_SG_SEP = [1.00 0.95 0.90 0.85 0.80 0.75 0.70 0.65 0.60 0.55 0.50];
 
 cornerBoxes  = default_corner_boxes(xyMin, xyMax, 2.0);
+
 if strcmpi(terrainName,'natural') && ~isempty(pondInfo)
+    % Push corners away from pond for natural
     cornerBoxes = corner_boxes_away_from_pond(cornerBoxes, pondInfo, 0.65);
+
+elseif strcmpi(terrainName,'man_made')
+    % Custom corner boxes that sit on LAND, not in the harbor.
+    % World is [-10,10] in both axes; harbor is left ~30% of width.
+    % These boxes are on/near the right side so BFS has clean corridors.
+    cornerBoxes = [ ...
+        -2,  xyMin(2)+2,              3.5, 3.5;   % left-middle land, just to the right of harbor
+         3,  xyMin(2)+2,              3.5, 3.5;   % bottom-right
+        -2,  xyMax(2)-2-3.5,          3.5, 3.5;   % top-left-ish land
+         3,  xyMax(2)-2-3.5,          3.5, 3.5];  % top-right
 end
+
 
 placed=false;
 for pass = 1:numel(relax_SG_CLR)
@@ -142,6 +159,74 @@ end
 if ~placed
     error('Week11_Validate:Scenario', 'Failed to place starts/goals deterministically for scenario.');
 end
+
+% === HARD OVERRIDE for man_made BLUE UAV (U1) ===
+% Force U1 (blue) to start in a mid band and end in a lower band,
+% both on land and with good clearance.
+if strcmpi(terrainName,'man_made')
+    % Clearance map based on inflated static occupancy
+    clrMap_local = bwdist(occ_static) * gridRes;
+
+    spanX = xyMax(1) - xyMin(1);
+    spanY = xyMax(2) - xyMin(2);
+
+    % Avoid the harbor on the far left: keep x to the RIGHT of the harbor.
+    % Harbor width is about 0.28*spanX, so 0.35*spanX is safely on land.
+    xLeftLand  = xyMin(1) + 0.35*spanX;   % just right of harbor
+    xRightLand = xyMax(1) - 0.10*spanX;   % near far-right edge
+
+    % ---------- START band (a bit lower than before) ----------
+    % Center around y ≈ +1.5 with some thickness.
+    yStartCenter = 1.5;      % move this number to shift start up/down
+    yStartHalf   = 1.2;      % band half-height
+    yStartMin    = yStartCenter - yStartHalf;
+    yStartMax    = yStartCenter + yStartHalf;
+
+    maskStart = (YC >= yStartMin) & (YC <= yStartMax) & ...
+                (XC >= xLeftLand) & (XC <= xRightLand) & ...
+                ~occ_static & ...
+                (clrMap_local > 0.7*SG_MIN_CLR_base);
+
+    % ---------- GOAL band (lower than start) ----------
+    % Center around y ≈ 0.0 (roughly middle), slightly lower band.
+    yGoalCenter = 0.0;       % move this number to shift goal up/down
+    yGoalHalf   = 1.0;
+    yGoalMin    = yGoalCenter - yGoalHalf;
+    yGoalMax    = yGoalCenter + yGoalHalf;
+
+    maskGoal = (YC >= yGoalMin) & (YC <= yGoalMax) & ...
+               (XC >= xLeftLand) & (XC <= xRightLand) & ...
+               ~occ_static & ...
+               (clrMap_local > 0.7*SG_MIN_CLR_base);
+
+    idxS = find(maskStart);
+    idxG = find(maskGoal);
+
+    if numel(idxS) >= 1 && numel(idxG) >= 1
+        % Pick a LEFT-ish start and a RIGHT-ish goal
+        [~, iSL] = min(XC(idxS));   % most left start
+        [rS,cS]  = ind2sub(size(maskStart), idxS(iSL));
+
+        [~, iGR] = max(XC(idxG));   % most right goal
+        [rG,cG]  = ind2sub(size(maskGoal), idxG(iGR));
+
+        sRC = [rS cS];
+        gRC = [rG cG];
+
+        % Only accept if connected on inflated free space
+        if has_path_bfs(sRC, gRC, ~occ_static)
+            starts(1,:) = [XC(rS,cS), YC(rS,cS)];
+            goals(1,:)  = [XC(rG,cG), YC(rG,cG)];
+        else
+            warning('man_made override for U1: chosen start/goal not connected, keeping random S/G.');
+        end
+    else
+        warning('man_made override for U1: not enough valid cells in start/goal bands, keeping random S/G.');
+    end
+end
+
+
+
 
 % --- Inject an obstacle between the YELLOW UAV's start and goal (natural only) ---
 if strcmpi(terrainName,'natural') && opts.NU >= 3 && ~isempty(pondInfo)
@@ -272,9 +357,20 @@ segFree = @(a,b,OccMask) ( ...
 TARGET_HW = [720 720];
 vidfile = fullfile(opts.viddir, sprintf('week11_%s_%s_%s_720p.mp4', ...
     lower(string(terrain_of(S))), lower(string(weatherStr)), lower(string(modeStr))));
+
+vw = [];   % handle to VideoWriter (may stay empty if something fails)
 if opts.makeVideo
-    vw = VideoWriter(vidfile,'MPEG-4'); vw.FrameRate=round(1/dt); vw.Quality=92; open(vw);
+    try
+        vw = VideoWriter(vidfile,'MPEG-4');
+        vw.FrameRate = round(1/dt);
+        vw.Quality   = 92;
+        open(vw);
+    catch ME
+        warning('Week 11: Video disabled for this run: %s', ME.message);
+        vw = [];   % make sure it is empty/invalid
+    end
 end
+
 
 fig = figure('Color','w','Units','pixels','Position',[80 80 760 820], ...
              'MenuBar','none','ToolBar','none','Renderer','opengl');
@@ -619,15 +715,38 @@ for k=1:Nsteps
     draw_wind_inset_on_axes(axMain, w_vec);
 
     % ---- write 720p frame ----
-    if exist('vw','var')
-        fr = getframe(axMain);
-        [C,~] = frame2im(fr);
-        C = imresize(C, [TARGET_HW(1) TARGET_HW(2)]);
-        writeVideo(vw, C);
+        % ---- write 720p frame ----
+    if ~isempty(vw) && isvalid(vw)
+        try
+            fr = getframe(axMain);
+            [C,~] = frame2im(fr);
+            C = imresize(C, [TARGET_HW(1) TARGET_HW(2)]);
+
+            % Make absolutely sure the frame is a uint8 truecolor image
+            if ~isa(C,'uint8')
+                C = im2uint8(mat2gray(C));
+            end
+
+            writeVideo(vw, C);
+            catch ME
+                warning('Week 11: writeVideo failed, disabling video for this run: %s', ME.message);
+                % Do NOT try to close here; just drop the handle.
+                vw = [];  % prevent any further writeVideo calls
+            end
+
     end
 end
 
-if exist('vw','var'), close(vw); fprintf('Saved: %s\n', vidfile); end
+
+if ~isempty(vw) && isvalid(vw)
+    try
+        close(vw);
+        fprintf('Saved: %s\n', vidfile);
+    catch ME
+        warning('Week 11: error while closing video: %s', ME.message);
+    end
+end
+
 
 lastStep = find(all(~isnan(traj(:,1,1)),2),1,'last'); if isempty(lastStep), lastStep=Nsteps; end
 R.reached = reached(:)';
@@ -709,9 +828,33 @@ function [starts, goals, ok] = place_sg_random_safely_adaptive(NU, xyMin, xyMax,
 clrMap = bwdist(occ_static)*gridRes;
 starts = nan(NU,2); goals = nan(NU,2); ok=false;
 
-maxSamples   = 18000;
-edgePad      = 2.0;
-minPairDist  = 6.0;
+% --- Default sampler knobs (urban / natural) ---
+span       = xyMax - xyMin;
+maxSamples = 18000;
+edgePad    = 2.0;
+minPairDist= 6.0;
+
+% --- SPECIAL CASE: man_made "harbor" layout ---
+% Detect if the first static polygon looks like a tall strip along the left side
+if ~isempty(staticPolys)
+    H = staticPolys{1};
+    xs = H(:,1); ys = H(:,2);
+
+    looksLikeHarbor = ...
+        (max(xs) - min(xs)) < 0.6*span(1) && ...      % not spanning entire width
+        min(xs) <= xyMin(1) + 0.08*span(1) && ...     % hugs left boundary
+        max(xs) >= xyMin(1) + 0.25*span(1) && ...     % has some width
+        min(ys) <= xyMin(2) + 0.05*span(2) && ...     % goes near bottom
+        max(ys) >= xyMax(2) - 0.05*span(2);           % goes near top
+
+    if looksLikeHarbor
+        % Man-made harbor is tighter: make the SG search much more forgiving
+        maxSamples = 40000;   % keep sampling longer
+        edgePad    = 1.0;     % allow closer to boundaries so we use all land
+        minPairDist= 3.0;     % allow start/goal to be closer to each other
+    end
+end
+
 
 % Keep a polyshape list of existing static polys to check overlap where needed
 statShapes = cellfun(@(P) polyshape(P(:,1),P(:,2)), staticPolys, 'uni', 0);
@@ -932,26 +1075,92 @@ end
 end
 
 function [P,C,pondInfo] = make_manmade(xyMin, xyMax)
-P={}; C={}; pondInfo=[];
-span=xyMax-xyMin;
-for i=1:6
-    if mod(i,2)==0
-        y0=xyMin(2)+(i-0.5)*span(2)/6;
-        rect=oriented_rect([0 y0], span(1)*0.9, 0.8, 0);
-        P{end+1}=rect; C{end+1}=[0.7 0.8 0.6];
-    end
+% Man-made terrain: harbor + a few piers + 3 small warehouses.
+
+P = {}; C = {};
+pondInfo = []; 
+
+span = xyMax - xyMin;
+xL   = xyMin(1); xR = xyMax(1);
+yB   = xyMin(2); yT = xyMax(2);
+
+%% Harbor water strip on the LEFT (static obstacle)
+harborWidth = 0.28 * span(1);          
+harbor = [ ...
+    xL             yB;
+    xL+harborWidth yB;
+    xL+harborWidth yT;
+    xL             yT;
+    xL             yB];
+P{end+1} = harbor;
+C{end+1} = [0.4 0.7 0.9];              % water color
+
+%% Piers extending from harbor into land (only 3, staggered)
+nPiers    = 3;
+pierLen   = 0.30 * span(1);            
+pierWidth = 0.6;
+yOffsets  = linspace(yB+0.20*span(2), yT-0.20*span(2), nPiers);
+
+for i = 1:nPiers
+    cy = yOffsets(i);
+    cx = xL + harborWidth + pierLen/2; % center in x
+    rect = oriented_rect([cx cy], pierLen, pierWidth, 0);
+    rect = [rect; rect(1,:)];          % close polygon
+    P{end+1} = rect;
+    C{end+1} = [0.65 0.65 0.72];       % concrete pier
 end
-harbor=[xyMin(1) xyMin(2);
-        xyMin(1)+0.25*span(1) xyMin(2);
-        xyMin(1)+0.25*span(1) xyMax(2);
-        xyMin(1) xyMax(2)];
-P{end+1}=harbor; C{end+1}=[0.4 0.7 0.9];
-for i=1:2
-    cx=-2+4*i; cy=0;
-    rect=oriented_rect([cx cy],span(1)*0.9,0.15,pi/8*randn);
-    P{end+1}=rect; C{end+1}=[0.3 0.3 0.4];
+
+%% Thin quay/road along the harbor edge (kept narrow)
+quayLen   = span(2)*0.90;
+quayWidth = 0.45;                      % thinner than before
+quayY     = 0;                         % centered in Y
+quayX     = xL + harborWidth + quayWidth/2;
+quayRect  = oriented_rect([quayX quayY], quayWidth, quayLen, 0);
+quayRect  = [quayRect; quayRect(1,:)];
+P{end+1}  = quayRect;
+C{end+1}  = [0.7 0.8 0.6];
+
+%% Warehouse blocks on the RIGHT (only 3)
+padOuterX = 0.12 * span(1);
+padOuterY = 0.12 * span(2);
+
+xStart = xL + harborWidth + 0.40*span(1);   % leave a wide central corridor
+xEnd   = xR - padOuterX;
+yStart = yB + padOuterY;
+yEnd   = yT - padOuterY;
+
+% Three warehouse centers: bottom-right, mid-right, top-right
+wh_centers = [
+    xEnd - 0.6*(xEnd-xStart), yStart + 0.25*(yEnd-yStart);   % lower
+    xEnd - 0.35*(xEnd-xStart), 0;                            % middle (near center height)
+    xEnd - 0.6*(xEnd-xStart), yEnd   - 0.25*(yEnd-yStart)    % upper
+];
+
+wh_w = 0.65 * (xEnd-xStart)/3;   % smaller than before
+wh_h = 0.45 * (yEnd-yStart)/2;
+
+for k = 1:size(wh_centers,1)
+    cx = wh_centers(k,1);
+    cy = wh_centers(k,2);
+    th = (k-1) * pi/40;          % tiny rotation just for variety
+    rect = oriented_rect([cx cy], wh_w, wh_h, th);
+    rect = [rect; rect(1,:)];
+    P{end+1} = rect;
+    C{end+1} = [0.3 0.3 0.4];    % darker warehouse color
 end
+
+%% Road near the top 
+roadWidth = 0.35;
+roadLen   = 0.80 * span(1);
+roadY     = yT - 1.7;
+roadRect  = oriented_rect([0 roadY], roadLen, roadWidth, 0);
+roadRect  = [roadRect; roadRect(1,:)];
+P{end+1}  = roadRect;
+C{end+1}  = [0.6 0.7 0.6];
+
 end
+
+
 
 function R = oriented_rect(center,w,h,th)
 cx=center(1); cy=center(2); hw=w/2; hh=h/2;
