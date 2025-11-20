@@ -1,5 +1,6 @@
 %% Week 9 — Integration with Simulation
-
+%% Input: 'week6_dataset.mat'
+%% Output: 'week9_final_path.png', 'week9_metrics.csv', and 'week9_demo.mp4'
 clear; clc; close all; clear fig; rng(77);
 
 %% --- Load Week 6 dataset & ridge policy ---
@@ -26,7 +27,7 @@ gridRes=0.20; safetyMargin=0.60;
 xyMin=[-10 -10]; xyMax=[10 10];
 startXY=[-8,-8]; goalXY=[8,2];
 
-% Blue wall (vertical slab) — top at y=5
+% Blue wall (vertical slab)
 x_wall_center = 0.60; wall_thickness = 0.40;
 x_left  = x_wall_center - wall_thickness/2;
 x_right = x_wall_center + wall_thickness/2;
@@ -67,7 +68,7 @@ stepCost  = [ sqrt(2); 1; sqrt(2); 1; 1; sqrt(2); 1; sqrt(2) ];
 
 clear_pref    = 0.55; clear_softmin = safetyMargin + 0.10;
 
-%% === FSM (CLIMB / POSTREL / LATERALCLR / DESCENT) ===
+%% === FSM ===
 STATE_NORMAL      = 0;
 STATE_CLIMB       = 1;
 STATE_POSTREL     = 2;
@@ -93,7 +94,7 @@ desc_x_lock = goalXY(1); descent_until=0;
 % “downward intent” bias to prevent up-hover when above wall & goal below
 DOWNLOCK_ON = true; DOWNLOCK_GAIN = 0.78; % strong downward pull when applicable
 
-%% lip penalty (discourage skimming)
+%% lip penalty
 lip_y_top=5.0; lip_band_h=safetyMargin+0.35;
 lip_x_min=x_left-(safetyMargin+0.10); lip_x_max=x_right+(safetyMargin+0.10);
 lip_penalty_w=1.4;
