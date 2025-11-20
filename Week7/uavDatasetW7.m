@@ -1,12 +1,10 @@
 %% Week 7 — Initial Model Training (MATLAB, no toolboxes)
-% Behavior cloning baseline: features -> actions (vx, vy, vz)
-% Uses ordinary least squares and ridge regression.
 % Reads: week6_dataset.mat created in Week 6
 % Writes: week7_results.txt, predictions .csv, and diagnostic plots
 
 clear; clc; close all;
 
-%% 1) Load dataset (from Week 6)
+%% Load dataset (from Week 6)
 if ~isfile('week6_dataset.mat')
     error('Could not find week6_dataset.mat. Make sure it is in the current folder.');
 end
@@ -26,12 +24,12 @@ Xte = X(test_idx,:);   Yte = Y(test_idx,:);
 [Ntr, D] = size(Xtr);  [~, K] = size(Ytr);
 fprintf('Train: %d, Val: %d, Test: %d, Features: %d\n', size(Xtr,1), size(Xva,1), size(Xte,1), D);
 
-%% 2) Add bias term
+%% Add bias term
 Xtr_b = [Xtr, ones(Ntr,1)];
 Xva_b = [Xva, ones(size(Xva,1),1)];
 Xte_b = [Xte, ones(size(Xte,1),1)];
 
-%% 3) Train OLS (closed-form)
+%% Train OLS (closed-form)
 % W_ols maps features->actions: (D+1)x3
 W_ols = (Xtr_b' * Xtr_b) \ (Xtr_b' * Ytr);
 
@@ -40,7 +38,7 @@ Ytr_hat_ols = Xtr_b * W_ols;
 Yva_hat_ols = Xva_b * W_ols;
 Yte_hat_ols = Xte_b * W_ols;
 
-%% 4) Train Ridge (closed-form) with simple lambda search
+%% Train Ridge with simple lambda search
 lambdas = logspace(-4, 2, 20);  % try a range
 bestVa = inf; bestLam = lambdas(1); W_ridge_best = W_ols;
 
@@ -62,7 +60,7 @@ Ytr_hat_ridge = Xtr_b * W_ridge_best;
 Yva_hat_ridge = Xva_b * W_ridge_best;
 Yte_hat_ridge = Xte_b * W_ridge_best;
 
-%% 5) Metrics (MSE, MAE, cosine similarity)
+%% Metrics (MSE, MAE, cosine similarity)
 metric = @(Yhat, Ytrue) struct( ...
     'mse', mean( sum( (Yhat - Ytrue).^2, 2 ) ), ...
     'mae', mean( mean( abs(Yhat - Ytrue), 2 ) ), ...
@@ -77,7 +75,7 @@ m_tr_rd = metric(Ytr_hat_ridge, Ytr);
 m_va_rd = metric(Yva_hat_ridge, Yva);
 m_te_rd = metric(Yte_hat_ridge, Yte);
 
-%% 6) Print and save results
+%% Print and save results
 fid = fopen('week7_results.txt','w');
 fprintf(fid, 'Week 7 — Initial Model Training (MATLAB, behavior cloning)\n');
 fprintf(fid, 'Data: Ntr=%d, Nva=%d, Nte=%d, D=%d\n\n', size(Xtr,1), size(Xva,1), size(Xte,1), D);
@@ -95,12 +93,12 @@ fclose(fid);
 
 disp('Saved metrics to week7_results.txt');
 
-% Save predictions (ridge)
+% Save predictions 
 writematrix(Ytr_hat_ridge, 'week7_pred_train.csv');
 writematrix(Yva_hat_ridge, 'week7_pred_val.csv');
 writematrix(Yte_hat_ridge, 'week7_pred_test.csv');
 
-%% 7) Quick diagnostic plots (saved as PNG)
+%% Quick diagnostic plots (saved as PNG)
 % Scatter: true vs pred for each component on test set
 lbl = {'v_x','v_y','v_z'};
 for j = 1:K
