@@ -1,6 +1,6 @@
 %% Week 9 — Integration with Simulation
-%% Input: 'week6_dataset.mat'
-%% Output: 'week9_final_path.png', 'week9_metrics.csv', and 'week9_demo.mp4'
+%% Input: week6_dataset.mat
+%% Output: week9_final_path.png, week9_metrics.csv, and week9_demo.mp4
 
 clear; clc; close all; clear fig; rng(77);
 
