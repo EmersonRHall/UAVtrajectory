@@ -1,12 +1,6 @@
 %% Week 9 — Full Randomization + Robust Video/Legend + UNSTICK (best solution)
-% - Randomizes ALL static objects + GOAL each run (start fixed unless changed)
-% - A* + string-pull + pure pursuit + ML nudge
-% - FSM: NORMAL -> CLIMB -> POSTREL -> LATERALCLR -> DESCENT (+ UNSTICK)
-% - Fixed-size video frames + robust legend from handles
-% - Works without any local functions in this script.
-% - Optional isLineFree.m (separate file) enables stronger LoS descent check.
-%
-% Outputs: week9_demo.mp4, week9_final_path.png, week9_metrics.csv
+%% Inputs: week6_dataset.mp4
+%% Outputs: week9_demo.mp4, week9_final_path.png, week9_metrics.csv
 
 clear; clc; close all; clear fig;
 rng('shuffle');   % new layout every run
