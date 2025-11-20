@@ -1,6 +1,7 @@
 %% Week 9 — Integration with Simulation
 %% Input: 'week6_dataset.mat'
 %% Output: 'week9_final_path.png', 'week9_metrics.csv', and 'week9_demo.mp4'
+
 clear; clc; close all; clear fig; rng(77);
 
 %% --- Load Week 6 dataset & ridge policy ---
@@ -91,7 +92,7 @@ LCLR_MAX_T   = 3.0; postrel_until=0; lclr_until=0; lat_sign=0;
 DESC_SPEED = 0.95*vmax; DESC_MAX_T=6.0; DESC_KX=0.60;
 desc_x_lock = goalXY(1); descent_until=0;
 
-% “downward intent” bias to prevent up-hover when above wall & goal below
+% 'downward intent' bias to prevent up-hover when above wall & goal below
 DOWNLOCK_ON = true; DOWNLOCK_GAIN = 0.78; % strong downward pull when applicable
 
 %% lip penalty
@@ -214,7 +215,7 @@ for k=1:Nsteps
             pathRC=[r c];
             while ~(r==sRC(1) && c==sRC(2))
                 prev=double(squeeze(cameFrom(r,c,:))'); if all(prev==0), break; end
-                r=prev(1); c=prev(2); pathRC(end+1,:)=[r c]; %#ok<AGROW>
+                r=prev(1); c=prev(2); pathRC(end+1,:)=[r c];
             end
             pathRC=flipud(pathRC); foundPath=true; break
         end
@@ -258,11 +259,11 @@ for k=1:Nsteps
             end
             if seg_free, best_j=j; j=j+1; else, break; end
         end
-        sp=pathXY(best_j,:); smoothPath(end+1,:)=sp; %#ok<AGROW>
+        sp=pathXY(best_j,:); smoothPath(end+1,:)=sp;
         idx=best_j+1;
     end
 
-    % --- Pure pursuit (v_plan) ---
+    % --- v plan ---
     v_plan=[0 0];
     if size(smoothPath,1)>=2
         acc=0; ii=2; target_wp=smoothPath(min(2,size(smoothPath,1)),:);
@@ -329,7 +330,7 @@ for k=1:Nsteps
             end
     end
 
-    %% --- DESCENT engage (with fallback if helper missing) ---
+    %% --- DESCENT engage ---
     if state==STATE_NORMAL
         above_goal = pos(2) > (goalXY(2) + 0.25);
         clear_of_slab= abs(pos(1) - x_wall_center) >= (wall_thickness/2 + safetyMargin*0.35);
@@ -354,7 +355,7 @@ for k=1:Nsteps
     % planner + ML
     u_nom = v_plan + (USE_ML*w_ml)*v_ml;
 
-    % downward intent: if we are above wall and goal is below, bias downward
+    % downward intent
     above_wall = pos(2) > lip_y_top + 0.05;
     goal_below = goalXY(2) < pos(2) - 0.1;
     if DOWNLOCK_ON && state==STATE_NORMAL && above_wall && goal_below
@@ -385,7 +386,7 @@ for k=1:Nsteps
         u_nom = 0.55*u_nom + 0.45*[pass_dir, 0];
     end
 
-    % corner-pop (disable during commit states)
+    % corner-pop
     rc = world2grid(pos);
     rc(1)=min(max(rc(1),1),mapRows); rc(2)=min(max(rc(2),1),mapCols);
     d_here = distMap(rc(1),rc(2));
@@ -426,7 +427,7 @@ for k=1:Nsteps
         u = (1-lowpass)*u_nom + lowpass*prev_u; prev_u=u;
     end
 
-    % speed scaling (keep speed up during commit states)
+    % speed scaling
     ttc_like=max(min(dmin/ray_max,1),0);
     base_floor = any(state==[STATE_POSTREL,STATE_LATERALCLR,STATE_DESCENT]) * 0.70 + ...
                  ~any(state==[STATE_POSTREL,STATE_LATERALCLR,STATE_DESCENT]) * 0.55;
@@ -434,7 +435,7 @@ for k=1:Nsteps
     spd=norm(u); if spd>vmax*speed_scale, u=(vmax*speed_scale/spd)*u; end
     if state==STATE_CLIMB, u(1)=0; u(2)=max(u(2),min_climb_vy); end
 
-    % --- integrate (substeps) ---
+    % --- integrate ---
     wind_term=[0 0]; if USE_WIND, wind_term = wind_xy + wind_sigma*randn(1,2); if state==STATE_CLIMB, wind_term(1)=0; end, end
     v_apply = u + wind_term;
     if state==STATE_CLIMB && v_apply(2)<min_climb_vy, v_apply(2)=min_climb_vy; end
@@ -506,7 +507,7 @@ for k=1:Nsteps
         patch(P(:,1),P(:,2),polyColors{p},'FaceAlpha',0.5,'EdgeColor','k');
     end
     if USE_DYN, patch(dynPoly(:,1),dynPoly(:,2),[.85 .4 .1],'FaceAlpha',0.6,'EdgeColor','k'); end
-    % lip band (visual)
+    % lip band 
     patch([lip_x_min lip_x_max lip_x_max lip_x_min], [lip_y_top lip_y_top lip_y_top+lip_band_h lip_y_top+lip_band_h], ...
           [0.6 0.8 1.0], 'FaceAlpha',0.15, 'EdgeColor','none');
     plot(startXY(1),startXY(2),'go','MarkerFaceColor','g');
