@@ -1,4 +1,8 @@
 %% Week 11 — Validation
+%% Outputs:
+%%     Videos: For terrain chosen and each wind type, Baseline and Machine Learning videos will be produced.
+%%     PNGS: Success by Terrain(Baseline and Machine Learning), Time by Mode and Length by Mode, Clearance CDF
+%%     CSV: week11_metrics.csv
 
 clc; close all;
 
@@ -173,7 +177,7 @@ if strcmpi(terrainName,'manmade')
     xLeftLand  = xyMin(1) + 0.35*spanX;
     xRightLand = xyMax(1) - 0.10*spanX;
 
-    % ---------- START band (a bit lower than before) ----------
+    % ---------- START band ----------
     yStartCenter = 1.5; 
     yStartHalf   = 1.2; 
     yStartMin    = yStartCenter - yStartHalf;
@@ -184,7 +188,7 @@ if strcmpi(terrainName,'manmade')
                 ~occ_static & ...
                 (clrMap_local > 0.7*SG_MIN_CLR_base);
 
-    % ---------- GOAL band (lower than start) ----------
+    % ---------- GOAL band ----------
     yGoalCenter = 0.0; 
     yGoalHalf   = 1.0;
     yGoalMin    = yGoalCenter - yGoalHalf;
@@ -432,7 +436,7 @@ for k=1:Nsteps
     distMap = imgaussfilt(bwdist(occ_thin)*gridRes, 1.5);
     [gy,gx] = gradient(distMap,gridRes,gridRes);
 
-    % -------- Build "reserved corridors" from other UAVs to force unique paths --------
+    % -------- Build reserved corridors from other UAVs to force unique paths --------
     occ_corridors = false(mapRows,mapCols);
 
     % Terrain-dependent corridor radius
@@ -512,7 +516,7 @@ for k=1:Nsteps
 
         occ_plan = occ_thick | occ_uav_i | occ_corr_i;
 
-        % Periodic replan (A* + strict string-pull against THICK + corridor reserve)
+        % Periodic replan
         if t>=astar_t_next(i) || isempty(pathXY{i})
             astar_t_next(i)=t+ASTAR_PERIOD; vel(i,:)=[0 0];
             sRC=rc_from_xy(pos(i,:)); gRC=rc_from_xy(goals(i,:));
@@ -644,7 +648,7 @@ for k=1:Nsteps
         spd_des = vmax * (dmin>=EMERGENCY_R) + vmax * BRAKE_GAIN * max(dmin/EMERGENCY_R,0) * (dmin<EMERGENCY_R);
         spd_des = max(spd_des, 0.25*vmax);
 
-        % -------- Wind controller (Week-10 style: simple & robust upwind) --------
+        % -------- Wind controller (Week-9 + 10 style) --------
         distGoal = norm(pos(i,:)-goals(i,:));
         mgp = MIN_GROUND_PROGRESS_FRAC * vmax * ...
               clamp(distGoal/(3*tolReach), 0, 1);  
@@ -657,8 +661,7 @@ for k=1:Nsteps
         if na > v_air_max
             v_air_cmd = (v_air_max/na) * v_air_cmd;
         end
-
-        % If we still don’t meet the ground-progress floor, push along-path only
+        
         gnd_prog = dot(v_air_cmd + w_vec, u_sm);
         if gnd_prog < mgp
             v_air_cmd = v_air_cmd + (mgp - gnd_prog)*u_sm;
@@ -898,7 +901,7 @@ end
 end
 
 % ======================================================================
-% Deterministic SG placement (with BFS connectivity on inflated grid)
+% Deterministic SG placement
 function [starts, goals, ok] = place_sg_random_safely_adaptive(NU, xyMin, xyMax, mapRows, mapCols, gridRes, ...
         staticPolys, XC, YC, SG_MIN_CLR, minSGsep, se_static, occ_static, cornerBoxes)
 
@@ -1202,7 +1205,7 @@ harbor = [ ...
     xL             yT;
     xL             yB];
 P{end+1} = harbor;
-C{end+1} = [0.4 0.7 0.9]; % water color
+C{end+1} = [0.4 0.7 0.9];
 
 %% Piers extending from harbor into land
 nPiers    = 3;
@@ -1216,7 +1219,7 @@ for i = 1:nPiers
     rect = oriented_rect([cx cy], pierLen, pierWidth, 0);
     rect = [rect; rect(1,:)];         
     P{end+1} = rect;
-    C{end+1} = [0.65 0.65 0.72];       % concrete pier
+    C{end+1} = [0.65 0.65 0.72];
 end
 
 %% Thin road along the harbor edge
@@ -1240,9 +1243,9 @@ yEnd   = yT - padOuterY;
 
 % Three warehouse centers: bottom-right, mid-right, top-right
 wh_centers = [
-    xEnd - 0.6*(xEnd-xStart), yStart + 0.25*(yEnd-yStart);   % lower
-    xEnd - 0.35*(xEnd-xStart), 0;                            % middle (near center height)
-    xEnd - 0.6*(xEnd-xStart), yEnd   - 0.25*(yEnd-yStart)    % upper
+    xEnd - 0.6*(xEnd-xStart), yStart + 0.25*(yEnd-yStart);
+    xEnd - 0.35*(xEnd-xStart), 0;
+    xEnd - 0.6*(xEnd-xStart), yEnd   - 0.25*(yEnd-yStart)
 ];
 
 wh_w = 0.65 * (xEnd-xStart)/3; 
@@ -1269,8 +1272,6 @@ C{end+1}  = [0.6 0.7 0.6];
 
 end
 
-
-
 function R = oriented_rect(center,w,h,th)
 cx=center(1); cy=center(2); hw=w/2; hh=h/2;
 pts=[-hw -hh; hw -hh; hw hh; -hw hh];
@@ -1286,7 +1287,7 @@ c=cos(th); s=sin(th); Rot=[c -s; s c];
 E=(pts*Rot')+[cx cy];
 end
 
-% ---------- Wind profile (planning + control) ----------
+% ---------- Wind profile ----------
 function P = wind_profile(name)
 switch lower(name)
     case 'calm'
