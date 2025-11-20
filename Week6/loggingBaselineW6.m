@@ -69,7 +69,7 @@ while true
             prev = double(squeeze(cameFrom(r,c,:))');
             if all(prev==0), break; end
             r = prev(1); c = prev(2);
-            pathRC(end+1,:) = [r c]; %#ok<AGROW>
+            pathRC(end+1,:) = [r c];
         end
         pathRC = flipud(pathRC);
         break;
@@ -113,8 +113,7 @@ title('Baseline A* with Wall (Blue) and Block (Grey)');
 grid on;
 
 %% ==================== WEEK 6 ADDITIONS ====================
-% Build a feature dataset from the path, normalize, split, and save.
-% No anonymous "isFree" needed; all checks are explicit to avoid syntax issues.
+% Build a feature dataset from the path, normalize, split, and save
 
 % --- Settings for feature engineering ---
 flightAlt = 0.0;              % using 2D path here
@@ -124,7 +123,7 @@ dirs_rad  = deg2rad(dirs_deg)';
 ray_max   = 5.0;              % meters
 ray_step  = res * 0.5;        % sampling step along each ray
 
-% --- Compute velocities along the path (finite difference) ---
+% --- Compute velocities along the path ---
 N = size(pathXY,1);
 velXY = zeros(N,2);
 if N >= 2
@@ -181,7 +180,7 @@ for i = 1:N
     log_done(i)    = double(i == N);
 end
 
-% --- Normalize features (z-score) ---
+% --- Normalize features ---
 mu = mean(log_feats, 1);
 sigma = std(log_feats, 0, 1); sigma(sigma==0) = 1;
 feats_norm = (log_feats - mu) ./ sigma;
