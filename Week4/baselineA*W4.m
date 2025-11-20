@@ -69,7 +69,7 @@ while true
             prev = double(squeeze(cameFrom(r,c,:))');
             if all(prev==0), break; end
             r = prev(1); c = prev(2);
-            pathRC(end+1,:) = [r c]; %#ok<AGROW>
+            pathRC(end+1,:) = [r c]; 
         end
         pathRC = flipud(pathRC);
         break;
