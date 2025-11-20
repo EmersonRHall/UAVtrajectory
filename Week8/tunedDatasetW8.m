@@ -4,7 +4,7 @@
 
 clear; clc; close all;
 
-%% 1) Load dataset from Week 6
+%% Load dataset from Week 6
 if ~isfile('week6_dataset.mat')
     error('Could not find week6_dataset.mat. Place it in the current folder.');
 end
@@ -23,9 +23,9 @@ Xte = X(test_idx,:);   Yte = Y(test_idx,:);
 [Ntr, D] = size(Xtr); K = size(Ytr,2);
 fprintf('Train: %d, Val: %d, Test: %d, Features: %d\n', size(Xtr,1), size(Xva,1), size(Xte,1), D);
 
-%% 2) Optional: drop near-constant columns (using TRAIN split only)
+%% Drop near-constant columns
 std_tr = std(Xtr, 0, 1);
-keep_cols = std_tr > 1e-8;         % conservative threshold
+keep_cols = std_tr > 1e-8;
 dropped = find(~keep_cols);
 if ~isempty(dropped)
     fprintf('Dropping %d near-constant feature(s): %s\n', numel(dropped), mat2str(dropped));
@@ -36,12 +36,12 @@ Xva = Xva(:, keep_cols);
 Xte = Xte(:, keep_cols);
 Dk  = size(Xtr,2);
 
-%% 3) Add bias column
+%% Add bias column
 Xtr_b = [Xtr, ones(Ntr,1)];
 Xva_b = [Xva, ones(size(Xva,1),1)];
 Xte_b = [Xte, ones(size(Xte,1),1)];
 
-%% 4) Ridge hyperparameter tuning on validation RMSE
+%% Ridge hyperparameter tuning on validation RMSE
 lambdas = logspace(-4, 2, 40);        % 1e-4 ... 1e2
 I = eye(Dk+1); I(end,end) = 0;        % do not regularize bias
 
@@ -73,7 +73,7 @@ title('Week 8 — Ridge Validation Curve');
 hold on; yline(bestVa,'k--'); xline(bestLam,'k:');
 saveas(gcf, 'week8_val_curve.png');
 
-%% 5) Final evaluation with best W
+%% Final evaluation with best W
 Ytr_hat = Xtr_b * W_best;
 Yva_hat = Xva_b * W_best;
 Yte_hat = Xte_b * W_best;
@@ -88,17 +88,16 @@ m_tr = metric(Ytr_hat, Ytr);
 m_va = metric(Yva_hat, Yva);
 m_te = metric(Yte_hat, Yte);
 
-%% 6) Proxy success rate (per-sample action error tolerance)
+%% Proxy success rate (per-sample action error tolerance)
 % Define success as per-sample L2 action error <= eps on ALL THREE components.
-% You can tighten/loosen eps as desired (dataset is normalized features, actions in native units).
-eps_tol = 1e-6;   % very strict given your tiny residuals
+eps_tol = 1e-6;
 succ_rate = @(Yhat, Ytrue, eps) mean(vecnorm(Yhat - Ytrue, 2, 2) <= eps);
 
 sr_tr = succ_rate(Ytr_hat, Ytr, eps_tol);
 sr_va = succ_rate(Yva_hat, Yva, eps_tol);
 sr_te = succ_rate(Yte_hat, Yte, eps_tol);
 
-%% 7) Save evaluation log
+%% Save evaluation log
 fid = fopen('week8_eval.txt','w');
 fprintf(fid, 'Week 8 — Evaluation & Hyperparameter Tuning\n');
 fprintf(fid, 'Splits: Ntr=%d, Nva=%d, Nte=%d, D=%d (kept=%d, dropped=%d -> %s)\n\n', ...
@@ -116,7 +115,7 @@ fclose(fid);
 
 disp('Saved evaluation log to week8_eval.txt');
 
-%% 8) Quick test scatter (pred vs true) saved as PNG
+%% Quick test scatter (pred vs true) saved as PNG
 lbl = {'v_x','v_y','v_z'};
 figure;
 tiledlayout(1,3,'Padding','compact','TileSpacing','compact');
@@ -132,11 +131,9 @@ end
 sgtitle('Week 8 — Pred vs True (Test)');
 saveas(gcf, 'week8_pred_vs_true_test.png');
 
-%% 9) Print concise summary to console
+%% Print concise summary to console
 fprintf('\n=== Week 8 Summary ===\n');
 fprintf('Best lambda: %.6g\n', bestLam);
 fprintf('Train  RMSE=%.3e  MAE=%.3e  Cos=%.6f  SR=%.1f%%\n', m_tr.rmse, m_tr.mae, m_tr.cos, 100*sr_tr);
 fprintf('Val    RMSE=%.3e  MAE=%.3e  Cos=%.6f  SR=%.1f%%\n', m_va.rmse, m_va.mae, m_va.cos, 100*sr_va);
 fprintf('Test   RMSE=%.3e  MAE=%.3e  Cos=%.6f  SR=%.1f%%\n', m_te.rmse, m_te.mae, m_te.cos, 100*sr_te);
-
-% End of script
