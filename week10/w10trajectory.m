@@ -1,4 +1,5 @@
-%% Week 10 — 2×UAV, Week-9 Controller Hardened (No Tunneling, Safe Visibility, Goal-Hold)
+%% Week 10 — 2×UAV, Week-9 Controller Hardened
+%% Outputs: week10_multi.mp4, week10_final.png
 
 clear; clc; close all; rng('shuffle');
 
@@ -17,7 +18,7 @@ clamp = @(v,lo,hi) max(min(v,hi),lo);
 rc_from_xy = @(xy) [ clamp(floor((xy(2)-xyMin(2))/gridRes)+1,1,mapRows), ...
                      clamp(floor((xy(1)-xyMin(1))/gridRes)+1,1,mapCols) ];
 
-%% Scene (Week-9 style polys + safe starts/goals)
+%% Scene (Week-9 style)
 r_pix = max(1, ceil(safetyMargin / gridRes)); se_static = strel('disk', r_pix, 0);
 maxTries = 60; SG_MIN_CLR = safetyMargin + 0.45;
 
@@ -84,11 +85,11 @@ ALPHA_MAX=0.35; EMERGENCY_R=1.0; BRAKE_GAIN=0.9;
 dirs=deg2rad(0:45:315); ray_max=6;
 min_clearance=0.25;
 
-% Integration & ray sampling (hardened)
-INT_MAX_STEP = 0.15*gridRes;       % <= 0.15*gridRes to prevent tunneling
-RAY_STEP     = 0.25*gridRes;       % visibility/ray sample spacing
+% Integration & ray sampling
+INT_MAX_STEP = 0.15*gridRes;
+RAY_STEP     = 0.25*gridRes;
 
-R_sep = 1.0;   % visual only
+R_sep = 1.0; 
 
 %% Wind (Week-9 minimal)
 W_MEAN = 0.3 + 0.4*rand;  W_DIR  = 2*pi*rand;
@@ -150,7 +151,7 @@ for k=1:Nsteps
     se_thick = strel('disk', r_thick, 0);
     occ_thick = imdilate(occ, se_thick);
 
-    % Distance map from THIN (for gradients/projection)
+    % Distance map from THIN
     distMap = imgaussfilt(bwdist(occ)*gridRes, 1.5);
     [gy,gx] = gradient(distMap,gridRes,gridRes);
 
@@ -174,7 +175,7 @@ for k=1:Nsteps
             vel(i,:)=[0 0];
         end
 
-        % Keep in bounds (soft)
+        % Keep in bounds
         margin=0.5;
         if pos(i,1) < xyMin(1)+margin, vel(i,1)=abs(vel(i,1)); end
         if pos(i,1) > xyMax(1)-margin, vel(i,1)=-abs(vel(i,1)); end
@@ -182,7 +183,7 @@ for k=1:Nsteps
         if pos(i,2) > xyMax(2)-margin, vel(i,2)=-abs(vel(i,2)); end
         pos(i,1)=clamp(pos(i,1),xyMin(1),xyMax(1)); pos(i,2)=clamp(pos(i,2),xyMin(2),xyMax(2));
 
-        % Other-UAV keep-out (planning only)
+        % Other-UAV keep-out
         R_sep_plan=1.0; uav_dilate = strel('disk', max(1,ceil(R_sep_plan/gridRes)), 0);
         occ_uav_i=false(mapRows,mapCols);
         for j=1:NU
@@ -194,11 +195,9 @@ for k=1:Nsteps
         end
         occ_plan = occ_thick | occ_uav_i;
 
-        % Replan (freeze + safe string-pull) when due
+        % Replan when due
         if t>=astar_t_next(i) || isempty(pathXY{i})
             astar_t_next(i)=t+ASTAR_PERIOD;
-
-            % freeze airspeed to avoid overshoot during route flip
             vel(i,:)=[0 0];
 
             sRC=rc_from_xy(pos(i,:)); gRC=rc_from_xy(goals(i,:));
@@ -247,7 +246,6 @@ for k=1:Nsteps
             if found
                 P=grid2world(pathRC);
             else
-                % retry without other-UAV keep-out
                 occ_retry = occ_thick; occ_retry(sRC(1),sRC(2))=false; occ_retry(gRC(1),gRC(2))=false;
                 gScore(:)=inf; fScore(:)=inf; cameFrom(:)=0; openSet(:)=false;
                 gScore(sRC(1),sRC(2))=0; fScore(sRC(1),sRC(2))=heur(sRC(1),sRC(2)); openSet(sRC(1),sRC(2))=true;
@@ -328,7 +326,7 @@ for k=1:Nsteps
         if norm(target_wp-last_wp(i,:))<0.5, target_wp=0.8*last_wp(i,:)+0.2*target_wp; end
         last_wp(i,:)=target_wp;
 
-        % Week-9 controller (Frenet + soft repulsion)
+        % Week-9 controller (Frenet)
         A=smoothPath{i}(max(cp_idx-1,1),:); B=smoothPath{i}(min(cp_idx,size(smoothPath{i},1)),:);
         t_hat=(B-A)/max(norm(B-A),1e-9); n_hat=[-t_hat(2), t_hat(1)];
         e_y=dot(pos(i,:)-cp_pt,n_hat);
@@ -347,7 +345,7 @@ for k=1:Nsteps
         alpha=min(ALPHA_MAX, w_rep*0.8);
         u_nom=(1-alpha)*u_path + alpha*v_rep; u_nom=u_nom/max(norm(u_nom),1e-9);
 
-        % Heading filter (rate-limited EMA)
+        % Heading filter
         HEADING_RATE_LIMIT=deg2rad(60); BETA=0.4;
         if norm(u_nom)>1e-9 && norm(prev_u(i,:))>1e-9
             ang_u=atan2(u_nom(2),u_nom(1)); ang_p=atan2(prev_u(i,2),prev_u(i,1));
@@ -357,8 +355,7 @@ for k=1:Nsteps
         end
         u_sm=(1-BETA)*prev_u(i,:) + BETA*u_nom; u_sm=u_sm/max(norm(u_sm),1e-9); prev_u(i,:)=u_sm;
 
-        % Speed + wind (Week-9) with goal taper
-        % Braking rays use segFree() (THICK)
+        % Speed + wind (Week-9)
         dmin=ray_max;
         for kk2=1:8
             dir=[cos(dirs(kk2)), sin(dirs(kk2))];
@@ -387,7 +384,7 @@ for k=1:Nsteps
             na=norm(v_air_cmd); if na>v_air_max, v_air_cmd=(v_air_max/na)*v_air_cmd; end
         end
 
-        % Stall recovery (unchanged)
+        % Stall recovery
         if distGoal < bestGoalDist(i) - PROG_EPS
             bestGoalDist(i)=distGoal; stallClock(i)=0;
         else
@@ -409,7 +406,7 @@ for k=1:Nsteps
         dv=v_air_cmd-vel(i,:); dv_max=amax*dt; nv=norm(dv); if nv>dv_max, dv=(dv_max/nv)*dv; end
         vel(i,:)=vel(i,:)+dv;
 
-        % Integrate ground motion with anti-tunneling substeps + segment check
+        % Integrate ground motion
         tryStep=(vel(i,:)+w_vec)*dt;
         Nsub=max(1,ceil(norm(tryStep)/INT_MAX_STEP)); sub_dt=dt/Nsub; subStep=tryStep/Nsub;
         for ss=1:Nsub
@@ -462,7 +459,7 @@ for k=1:Nsteps
         hT=plot(traj(1:k,1,i),traj(1:k,2,i),'-','Color',col,'LineWidth',2.0);
         hSg=plot(starts(i,1),starts(i,2),'o','MarkerFaceColor',col,'Color',col,'MarkerSize',6);
         hG=plot(goals(i,1),goals(i,2),'x','Color',col,'LineWidth',1.6,'MarkerSize',10);
-        legH=[legH hT hSg hG]; legL=[legL {sprintf('U%d traj',i) sprintf('U%d start',i) sprintf('U%d goal',i)}]; %#ok<AGROW>
+        legH=[legH hT hSg hG]; legL=[legL {sprintf('U%d traj',i) sprintf('U%d start',i) sprintf('U%d goal',i)}];
         th=linspace(0,2*pi,40); circ=pos(i,:)+R_sep*[cos(th(:)) sin(th(:))];
         plot(circ(:,1),circ(:,2),':','Color',col,'LineWidth',1.0);
         if reached(i), plot(pos(i,1),pos(i,2),'s','MarkerSize',8,'MarkerFaceColor',col,'Color',col); end
