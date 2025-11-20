@@ -6,7 +6,7 @@ clear; clc; close all; clear fig;
 rng('shuffle');   % new layout every run
 
 %% --- Load Week 6 dataset & ridge policy ---
-S = load('week6_dataset.mat'); % expects features/actions/split
+S = load('week6_dataset.mat');
 X  = S.features;  Y  = S.actions;
 itr = S.split.train(:);  iva = S.split.val(:);
 Xtr = X(itr,:);   Ytr = Y(itr,:);
@@ -27,9 +27,9 @@ end
 
 %% --- World & bounds ---
 gridRes=0.20; 
-safetyMargin = 0.70;      % tougher base safety (↑ from 0.60)
+safetyMargin = 0.70;
 xyMin=[-10 -10]; xyMax=[10 10];
-startXY=[-8,-8];   % fixed; change if you want it randomized too
+startXY=[-8,-8];
 
 % Grid
 xv=xyMin(1):gridRes:xyMax(1); yv=xyMin(2):gridRes:xyMax(2);
@@ -37,13 +37,13 @@ xv=xyMin(1):gridRes:xyMax(1); yv=xyMin(2):gridRes:xyMax(2);
 world2grid=@(xy)[ round((xy(2)-xyMin(2))/gridRes)+1, round((xy(1)-xyMin(1))/gridRes)+1 ];
 grid2world=@(rc)[ xyMin(1)+(rc(:,2)-1)*gridRes, xyMin(2)+(rc(:,1)-1)*gridRes ];
 
-%% --- Random layout generator (retry until solvable) ---
+%% --- Random layout generator ---
 maxTries = 25;
-goalXY   = [8,2]; % placeholder; will be randomized below
+goalXY   = [8,2]; 
 haveLoS  = exist('isLineFree','file')==2;
 
 for attempt = 1:maxTries
-    % Randomize main vertical blue wall (rail-pinned climb)
+    % Randomize main vertical blue wall
     wall_thickness = max(0.30, min(0.60, 0.45 + 0.12*randn()));
     x_wall_center  = 0.0 + 1.2*randn();
     x_left  = x_wall_center - wall_thickness/2;
@@ -60,7 +60,7 @@ for attempt = 1:maxTries
     gy1 = max(-0.8,            gyc - gh/2); gy2 = min(xyMax(2)-0.8, gyc + gh/2);
     grayBox  = [gx1 gy1; gx2 gy1; gx2 gy2; gx1 gy2];
 
-    % Extra static rectangles / thin walls (3–6)
+    % Extra thin walls (3–6)
     nExtra = randi([3 6]);
     extraPolys = cell(1,nExtra);
     for i=1:nExtra
@@ -93,14 +93,14 @@ for attempt = 1:maxTries
         extraPolys{i} = [x1 y1; x2 y1; x2 y2; x1 y2];
     end
 
-    % Randomize GOAL (ensure free & solvable by static A*)
+    % Randomize GOAL
     goal_ok = false;
     for gtry=1:150
         gx = (xyMin(1)+1.0) + (xyMax(1)-2.0 - (xyMin(1)+1.0))*rand();
         gy = (xyMin(2)+1.0) + (xyMax(2)-2.0 - (xyMin(2)+1.0))*rand();
         goalXY = [gx, gy];
 
-        % Provisional static occupancy (inflated)
+        % Provisional static occupancy
         occ0=false(mapRows,mapCols);
         polysToTest = [{blueWall, grayBox}, extraPolys];
         for p=1:numel(polysToTest)
@@ -158,17 +158,17 @@ end
 staticPolys = [{blueWall, grayBox}, extraPolys];
 polyColors  = [{[0 0 1]}, {[0.5 0.5 0.5]}];
 while numel(polyColors) < numel(staticPolys)
-    polyColors{end+1} = 0.25 + 0.5*rand(1,3); %#ok<*AGROW>
+    polyColors{end+1} = 0.25 + 0.5*rand(1,3); 
 end
 
-%% --- Dynamic obstacle(s) (random) + wind ---
+%% --- Dynamic obstacle (random) + wind ---
 dyn_w = 3.0 + 0.8*rand(); dyn_h = 2.2 + 0.6*rand();
 dcx = -2.5 + 5.0*rand(); dcy = -6.0 + 3.0*rand();
 dynBase=[dcx-dyn_w/2 dcy-dyn_h/2;
          dcx+dyn_w/2 dcy-dyn_h/2;
          dcx+dyn_w/2 dcy+dyn_h/2;
          dcx-dyn_w/2 dcy+dyn_h/2];
-dynAmp = max(1.2, min(3.0, 2.0 + 0.6*randn()));  % horizontal sweep
+dynAmp = max(1.2, min(3.0, 2.0 + 0.6*randn())); 
 dynPer = max(6.0, min(10.0, 8.0 + 1.0*randn()));
 
 % Optional second moving obstacle (40% chance)
@@ -195,11 +195,11 @@ lookahead_m = 1.4; max_turn = pi; lowpass  = 0.18;
 w_ml = 0.18;
 
 dirs = deg2rad(0:45:315); ray_max=6; ray_step=gridRes*0.5;
-shortcut_step = 0.08; min_clearance = 0.18;     % (↑) wider safety in string-pull
+shortcut_step = 0.08; min_clearance = 0.18; 
 
 neighbors = [ -1 -1; -1 0; -1 1; 0 -1; 0 1; 1 -1; 1 0; 1 1 ];
 stepCost  = [ sqrt(2); 1; sqrt(2); 1; 1; sqrt(2); 1; sqrt(2) ];
-clear_pref = 0.85; clear_softmin = safetyMargin + 0.18;  % (↑) cost near obstacles
+clear_pref = 0.85; clear_softmin = safetyMargin + 0.18; 
 
 %% === FSM states ===
 STATE_NORMAL      = 0;
@@ -209,19 +209,19 @@ STATE_LATERALCLR  = 3;
 STATE_DESCENT     = 4;
 state             = STATE_NORMAL;
 
-% ---- UNSTICK (grittier) ----
+% ---- UNSTICK ----
 STATE_UNSTICK     = 5;
-STUCK_VEL_EPS   = 0.04;   % m/s considered "not moving"
-STUCK_MOV_EPS   = 0.12;   % net displacement over window considered "stuck"
-STUCK_WIN_T     = 2.4;    % seconds to look back
-UNSTICK_T       = 2.1;    % (↑) longer push to break deadlocks
-UNSTICK_POP     = 0.65;   % extra normal push during UNSTICK
+STUCK_VEL_EPS   = 0.04; 
+STUCK_MOV_EPS   = 0.12; 
+STUCK_WIN_T     = 2.4;
+UNSTICK_T       = 2.1;
+UNSTICK_POP     = 0.65;
 unstick_until   = 0;
-escape_dir      = [0 0];  % unit vector chosen at entry
+escape_dir      = [0 0];
 
 % CLIMB/POSTREL/LATERAL CLEAR params
 climb_band    = safetyMargin + 0.20;
-climb_until_y = wall_top_y + (safetyMargin + 0.75);  % tie to randomized wall top
+climb_until_y = wall_top_y + (safetyMargin + 0.75);
 release_hyst  = safetyMargin + 0.30;
 hold_offset   = safetyMargin + 0.15;
 climb_speed   = 0.85*vmax; min_climb_vy  = 0.60*climb_speed; x_pin=NaN;
@@ -230,14 +230,14 @@ POSTREL_T=1.2; POSTREL_PUSH=0.95;
 LCLR_CLEAR_X = wall_thickness/2 + safetyMargin + 0.70;
 LCLR_MAX_T   = 3.0; postrel_until=0; lclr_until=0; lat_sign=0;
 
-% DESCENT (column lock + decisive down)
+% DESCENT 
 DESC_SPEED = 0.95*vmax; DESC_MAX_T=6.0; DESC_KX=0.60;
 desc_x_lock = 0; descent_until=0;
 
 % Downward bias fallback
 DOWNLOCK_ON = true; DOWNLOCK_GAIN = 0.78;
 
-% Lip penalty band (discourage skimming at randomized wall top)
+% Lip penalty band
 lip_y_top=wall_top_y; lip_band_h=safetyMargin+0.35;
 lip_x_min=x_left-(safetyMargin+0.10); lip_x_max=x_right+(safetyMargin+0.10);
 lip_penalty_w=1.4;
@@ -256,7 +256,7 @@ USE_WIND=true; USE_DYN=true; USE_ML=true; LOG_CSV=true;
 pos=startXY; vel=[0 0]; prev_u=[0 0];
 traj=zeros(Nsteps,2); dmin_hist=nan(Nsteps,1); speed_hist=nan(Nsteps,1); t_hist=nan(Nsteps,1);
 
-%% --- Video (fixed-size) ---
+%% --- Video ---
 vidW = 900; vidH = 900;
 fig = figure('Color','w','Visible','on', ...
              'Units','pixels','Position',[100 100 vidW vidH], ...
@@ -268,7 +268,7 @@ set(ax,'LooseInset',[0 0 0 0]); box(ax,'on');
 vOut = VideoWriter('week9_demo.mp4','MPEG-4');
 vOut.FrameRate = round(1/dt);
 open(vOut);
-targetSize = [];   % frame size lock on first frame
+targetSize = [];
 
 % Morphology SEs
 se_static = strel('disk', max(1, ceil(safetyMargin / gridRes)), 0);
@@ -290,7 +290,7 @@ for k=1:Nsteps
         dyn2Poly=[];
     end
 
-    % Occupancy (static + dyn)
+    % Occupancy
     occ_static=false(mapRows,mapCols);
     for p=1:numel(staticPolys)
         P=staticPolys{p};
@@ -354,7 +354,7 @@ for k=1:Nsteps
         end
     end
 
-    % ------------ A* with lip penalty (using occ_plan) ------------
+    % ------------ A* with lip penalty ------------
     sRC=world2grid(pos); gRC=world2grid(goalXY);
     sRC(1)=min(max(sRC(1),1),mapRows); sRC(2)=min(max(sRC(2),1),mapCols);
     gRC(1)=min(max(gRC(1),1),mapRows); gRC(2)=min(max(gRC(2),1),mapCols);
@@ -440,7 +440,7 @@ for k=1:Nsteps
         sp=pathXY(best_j,:); smoothPath(end+1,:)=sp; idx=best_j+1;
     end
 
-    % ------------ Pure pursuit (v_plan) ------------
+    % ------------ V plan ------------
     v_plan=[0 0];
     if size(smoothPath,1)>=2
         acc=0; ii=2; target_wp=smoothPath(min(2,size(smoothPath,1)),:);
@@ -476,19 +476,19 @@ for k=1:Nsteps
     feat=[rel_goal, v3, wind_xy, dist8']; fx=feat(keep_cols);
     yhat=[fx,1]*W_best; v_ml=yhat(1:2);
 
-    % ---- Deadlock detector -> enter UNSTICK (before FSM transitions) ----
+    % ---- Deadlock detector -> enter UNSTICK ----
     winN = max(1, ceil(STUCK_WIN_T/dt));
     if k > winN && any(traj(max(1,k-winN),:) ~= 0)
         net_mov = norm(pos - traj(k-winN, :));
     else
-        net_mov = inf;  % not enough history yet
+        net_mov = inf;
     end
     is_slow  = (norm(vel) < STUCK_VEL_EPS);
     is_stuck = (net_mov < STUCK_MOV_EPS) || is_slow;
 
     if (state ~= STATE_CLIMB) && (state ~= STATE_DESCENT)
         if is_stuck && (t >= unstick_until) && k > 2
-            % Choose escape direction = blend of normal + goal; fallback to widest ray
+            % Choose escape direction = blend of normal + goal
             rc_e = world2grid(pos);
             rc_e(1)=min(max(rc_e(1),1),mapRows); rc_e(2)=min(max(rc_e(2),1),mapCols);
             n_e = [gx(rc_e(1),rc_e(2)), gy(rc_e(1),rc_e(2))];
@@ -498,7 +498,6 @@ for k=1:Nsteps
             esc = 0.60*n_e + 0.40*gdir;
 
             if norm(esc) < 1e-6
-                % fallback: pick the most open of the 8 ray directions
                 bestd = -inf; esc = [1,0];
                 for kk2=1:8
                     ddir=[cos(dirs(kk2)), sin(dirs(kk2))]; s=0; d=ray_max;
@@ -528,7 +527,7 @@ for k=1:Nsteps
         case STATE_NORMAL
             if near_wall_by_x && below_top
                 if pos(1) <= x_wall_center, x_pin = x_left  - (safetyMargin + 0.15);
-                else,                         x_pin = x_right + (safetyMargin + 0.15);
+                else, x_pin = x_right + (safetyMargin + 0.15);
                 end
                 state = STATE_CLIMB;
             end
@@ -558,7 +557,7 @@ for k=1:Nsteps
     %% ------------ DESCENT engage ------------
     if state==STATE_NORMAL
         above_goal = pos(2) > (goalXY(2) + 0.25);
-        clear_of_slab = abs(pos(1) - x_wall_center) >= (wall_thickness/2 + safetyMargin*0.50);  % tighter than before
+        clear_of_slab = abs(pos(1) - x_wall_center) >= (wall_thickness/2 + safetyMargin*0.50);
         if above_goal && clear_of_slab
             okH=false; okV=false;
             if haveIsLineFree
@@ -577,8 +576,6 @@ for k=1:Nsteps
 
     %% ------------ Command composition ------------
     u_nom = v_plan + w_ml*v_ml;
-
-    % Downward intent bias
     above_wall = pos(2) > lip_y_top + 0.05;
     goal_below = goalXY(2) < pos(2) - 0.1;
     if DOWNLOCK_ON && state==STATE_NORMAL && above_wall && goal_below
@@ -587,7 +584,7 @@ for k=1:Nsteps
         u_nom = 0.78*(down_vec + [0.35*x_correction, 0]) + 0.22*u_nom;
     end
 
-    % Dynamic obstacle side-pass latch (expanded bboxes)
+    % Dynamic obstacle side-pass latch
     dynBoxList = [];
     if ~isempty(dynPoly)
         dynBoxList(end+1,:) = [min(dynPoly(:,1)) max(dynPoly(:,1)) min(dynPoly(:,2)) max(dynPoly(:,2))];
@@ -637,7 +634,7 @@ for k=1:Nsteps
         u_nom = 0.60*u_nom + 0.40*t_push;
     end
 
-    % State-specific actuation (UNSTICK updated)
+    % State-specific actuation
     if state==STATE_CLIMB
         u = [0, max(climb_speed, min_climb_vy)]; prev_u=u;
 
@@ -654,7 +651,6 @@ for k=1:Nsteps
         u = [DESC_KX*max(-1,min(1,x_err)), -DESC_SPEED]; prev_u=u;
 
     elseif state==STATE_UNSTICK
-        % push escape_dir + pop away from obstacles + a little goal plan + jitter
         t_est = [ -n_est(2), n_est(1) ];
         jitter = 0.10 * (2*rand(1,2)-1);                 
         goal_dir = goalXY - pos; ng = norm(goal_dir); if ng>1e-9, goal_dir=goal_dir/ng; else, goal_dir=[1 0]; end
@@ -688,7 +684,7 @@ for k=1:Nsteps
     spd=norm(u); if spd>vmax*speed_scale, u=(vmax*speed_scale/spd)*u; end
     if state==STATE_CLIMB, u(1)=0; u(2)=max(u(2),min_climb_vy); end
 
-    % ------------ Integrate (substeps) ------------
+    % ------------ Integrate ------------
     wind_term=[0 0]; if USE_WIND, wind_term = wind_xy + wind_sigma*randn(1,2); if state==STATE_CLIMB, wind_term(1)=0; end, end
     v_apply = u + wind_term;
     if state==STATE_CLIMB && v_apply(2)<min_climb_vy, v_apply(2)=min_climb_vy; end
@@ -789,7 +785,7 @@ for k=1:Nsteps
         Lh(end+1) = hDyn2; Ll(end+1) = "dynamic 2";
     end
 
-    % Lip band (visual)
+    % Lip band
     hLip = patch('Parent',ax, ...
                  'XData',[lip_x_min lip_x_max lip_x_max lip_x_min], ...
                  'YData',[lip_y_top lip_y_top lip_y_top+lip_band_h lip_y_top+lip_band_h], ...
@@ -824,7 +820,7 @@ for k=1:Nsteps
         xline(ax, x_pin,'--k');
     end
 
-    % Legend (freeze layout)
+    % Legend 
     isValid = arrayfun(@isgraphics, Lh);
     leg = legend(ax, Lh(isValid), cellstr(Ll(isValid)), ...
                  'Location','northwest', 'AutoUpdate','off');
